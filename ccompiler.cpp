@@ -5,10 +5,19 @@
 #include <string>
 #include <map>
 using namespace std;
-
+#define IDEN "标识符"
+#define KEY "关键词"
+#define OPERATOR "运算符"
+#define BOUND "限界符"
+#define COMMENT1 "注释//"
+#define COMMENT2 "注释/**/"
+#define INT "整型"
+#define DECIMAL "实型"
+#define SCIENCE "科学计数法"
+#define ERROR "错误"
 
 //-----------关键词表-----------
-string keyword[] = {"auto", "short", "int", "long", "float", "double","char",
+string keyword[32] = {"auto", "short", "int", "long", "float", "double","char",
     "struct", "union", "enum", "typedef", "const", "unsigned", "signed",
     "extern", "register", "static", "volatile", "void", "if", "else",
     "switch", "case", "for", "do", "while", "goto", "continue", "break",
@@ -23,6 +32,15 @@ char boundword[] = "=;,\":().[]{}";
 
 map<string, string> mymap;
 int leno, lenb;
+
+
+struct Node{
+    char type[20];
+    char value[20];
+    int line;
+    Node *next;
+}*root, *p;
+
 void init(){
     leno = strlen(operatorword);
     lenb = strlen(boundword);
@@ -41,9 +59,52 @@ void init(){
     mymap["/"] = "DIV";
     mymap["<"] = "LESS_THAN";
     mymap[">"] = "GTEATER_THAN";
+
+    root = p = NULL;
 }
 
-void pro(){}
+void pro(char *type, char *value, int line){
+    Node *q = new Node;
+    strcpy(q->type, type);
+    strcpy(q->value, value);
+    q->line = line;
+    q->next = NULL;
+    if(root == NULL){
+        root = q;
+    }else{
+        p->next = q;
+    }
+    p = q;
+}
+
+
+char *stringTochar(string s){
+    char *ch;
+    int len = s.length();
+    ch = new char[len+1];
+    for(int i=0; i<len; i++){
+        ch[i] = s[i];
+    }
+    ch[len] = '\0';
+    return ch;
+}
+
+void test(){
+    char *ch = stringTochar("nihao");
+    cout<<ch<<endl;
+    cout<<"end"<<endl;
+}
+
+void display(){
+    p = root;
+    Node *q;
+    while(p != NULL){
+        cout<<"(   "<<p->line<<"  ,  "<<p->type<<"  ,  "<<p->value<<"   )"<<endl;
+        q = p;
+        p = p->next;
+        delete q;
+    }
+}
 
 
 int main(){
@@ -52,9 +113,9 @@ int main(){
     int line = 1;
     int count;
     char tmp[50];
-    char *word;
+    char *word = NULL;
     int isD, isE;
-    FILE *fp;
+    FILE *fp = NULL;
     if((fp = fopen("1.txt", "r")) == NULL){
         printf("文件不存在");
         return 0;
@@ -62,7 +123,6 @@ int main(){
     init();
     while(ch != EOF){
         ch = fgetc(fp);
-        //printf("%c\n",ch);
         //处理注释
         if(ch == '/'){
             pre = ch;
@@ -73,7 +133,10 @@ int main(){
                     pre = ch;
                     ch = fgetc(fp);
                 }
-                pro();
+                if(ch == '\n'){
+                    line ++;
+                }
+                pro(stringTochar(COMMENT1), stringTochar(""), line);
             }else if(ch == '*'){ //处理 ‘/* */’类型注释
                 pre = fgetc(fp);
                 ch = fgetc(fp);
@@ -84,9 +147,9 @@ int main(){
                         line ++;
                     }
                 }
-                pro();
+                pro(stringTochar(COMMENT2), stringTochar(""), line);
             }else{ //处理运算符‘/’
-                pro();
+                pro(stringTochar(OPERATOR), stringTochar("/"), line);
             }
         }else if((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_'){ //处理关键字和标识符
             count = 0;
@@ -97,10 +160,22 @@ int main(){
             word = (char *)malloc(sizeof(char)*(count+1));
             memcpy(word, tmp, count);
             word[count] = '\0';
-
-            cout<<word<<endl;
-
-            pro();
+            string tt;
+            for(int i=0; i<count; i++){
+                tt[i] = tmp[i];
+            }
+            tt[count] = '\0';
+            bool flag = false;
+            for(int i=0; i<32; i++){
+                if(keyword[i] == tt){
+                    pro(stringTochar(KEY), word, line);
+                    flag = true;
+                }
+            }
+            if(!flag){
+                pro(stringTochar(IDEN), word, line);
+            }
+            free(word);
             fseek(fp, -1L, SEEK_CUR); //回退1个char
         }else if(ch >= '0' && ch <= '9'){ //处理数字常量
             count = 0;
@@ -140,41 +215,46 @@ int main(){
                 }else{
                     isE = -1; //出错，-1表示E后面的格式不对
                 }
-
-                cout<<tmp<<endl;
             }
-
             word = (char *)malloc(sizeof(char)*(count+1));
             memcpy(word, tmp, count);
             word[count] = '\0';
             if(isD == 1){
-                pro(); // 带小数点实数
+                pro(stringTochar(DECIMAL), word, line); // 带小数点实数
             }else if(isE == 1){
-                pro(); // 科学计数法表示的实数
+                pro(stringTochar(SCIENCE), word, line); // 科学计数法表示的实数
             }else if(isD != -1 && isE != -1){
-                pro(); // 整数
+                pro(stringTochar(INT), word, line); // 整数
             }else{
-                pro(); // 出错
+                pro(stringTochar(ERROR), word, line); // 出错
             }
+            free(word);
             fseek(fp, -1L, SEEK_CUR);
         }else if(ch == '\n' || ch == ' ' || ch == '\t' || ch == '\r'){ // 处理换行
             if(ch == '\n'){
                 line ++;
             }
         }else if(ch == '#'){ // 处理头文件和宏常量
-            pro();
+            //pro();
         }else{
+            word = (char *)malloc(sizeof(char)*20);
             for(int i=0; i<leno; i++){
                 if(ch == operatorword[i]){
-                    pro();
+                    word[0] = ch;
+                    word[1] = '\0';
+                    pro(stringTochar(OPERATOR), word, line);
                 }
             }
             for(int i=0; i<lenb; i++){
                 if(ch == boundword[i]){
-                    pro();
+                    word[0] = ch;
+                    word[1] = '\0';
+                    pro(stringTochar(BOUND), word, line);
                 }
             }
+            free(word);
         }
     }
+    display();
     return 0;
 }
