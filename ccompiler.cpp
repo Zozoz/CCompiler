@@ -3,8 +3,11 @@
 #include <stdlib.h>
 #include <cstring>
 #include <string>
+#include <fstream>
 #include <map>
 using namespace std;
+#define INCLUDE "头文件"
+#define DEFINE "宏常量"
 #define IDEN "标识符"
 #define KEY "关键词"
 #define OPERATOR "运算符"
@@ -16,13 +19,15 @@ using namespace std;
 #define SCIENCE "科学计数法"
 #define ERROR "错误"
 
-//-----------关键词表-----------
-string keyword[32] = {"auto", "short", "int", "long", "float", "double","char",
-    "struct", "union", "enum", "typedef", "const", "unsigned", "signed",
-    "extern", "register", "static", "volatile", "void", "if", "else",
-    "switch", "case", "for", "do", "while", "goto", "continue", "break",
-    "default", "sizeof", "return"
+//-----------头文件名-----------
+string headword[] = {
+    "stdlib.h", "stdio.h", "string.h", "math.h"
 };
+
+//-----------关键字表-----------
+char *key[100];
+int num_key;
+char filename[] = "keyword.txt";
 
 //-----------运算符表-----------
 char operatorword[] = "+-*/<>";
@@ -40,6 +45,28 @@ struct Node{
     int line;
     Node *next;
 }*root, *p;
+
+
+void get_keyword(){
+    fstream fin;
+    fin.open(filename);
+    if (!fin){
+        cout<<"error"<<endl;
+        exit(1);
+    }
+    char ch[50];
+    while(fin.getline(ch, sizeof(ch))){
+        int len = strlen(ch) + 1;
+        key[num_key] = new char[len];
+        strcpy(key[num_key], ch);
+        key[num_key][len] = '\0';
+        num_key++;
+    }
+    for(int i=0; i<num_key; i++){
+        cout<<key[i]<<"|"<<endl;
+    }
+
+}
 
 void init(){
     leno = strlen(operatorword);
@@ -61,6 +88,8 @@ void init(){
     mymap[">"] = "GTEATER_THAN";
 
     root = p = NULL;
+
+    num_key = 0;
 }
 
 void pro(char *type, char *value, int line){
@@ -121,6 +150,8 @@ int main(){
         return 0;
     }
     init();
+    get_keyword();
+    //return 0;
     while(ch != EOF){
         ch = fgetc(fp);
         //处理注释
@@ -160,14 +191,15 @@ int main(){
             word = (char *)malloc(sizeof(char)*(count+1));
             memcpy(word, tmp, count);
             word[count] = '\0';
-            string tt;
-            for(int i=0; i<count; i++){
-                tt[i] = tmp[i];
-            }
-            tt[count] = '\0';
+            //string tt;
+            //for(int i=0; i<count; i++){
+            //    tt[i] = tmp[i];
+            //}
+            //tt[count] = '\0';
             bool flag = false;
-            for(int i=0; i<32; i++){
-                if(keyword[i] == tt){
+            for(int i=0; i<num_key; i++){
+                if (strcmp(key[i], word) == 0){
+                //if(keyword[i] == tt){
                     pro(stringTochar(KEY), word, line);
                     flag = true;
                 }
@@ -176,6 +208,7 @@ int main(){
                 pro(stringTochar(IDEN), word, line);
             }
             free(word);
+            word = NULL;
             fseek(fp, -1L, SEEK_CUR); //回退1个char
         }else if(ch >= '0' && ch <= '9'){ //处理数字常量
             count = 0;
@@ -229,13 +262,30 @@ int main(){
                 pro(stringTochar(ERROR), word, line); // 出错
             }
             free(word);
+            word = NULL;
             fseek(fp, -1L, SEEK_CUR);
         }else if(ch == '\n' || ch == ' ' || ch == '\t' || ch == '\r'){ // 处理换行
             if(ch == '\n'){
                 line ++;
             }
         }else if(ch == '#'){ // 处理头文件和宏常量
-            //pro();
+            count = 0;
+            word = (char *)malloc(sizeof(char)*20);
+            ch = fgetc(fp);
+            while(ch != ' ' && ch != '\n' && ch != '\"' && ch != '<'){
+                word[count++] = ch;
+                ch = fgetc(fp);
+            }
+            word[count] = '\0';
+            if(strcmp("include", word) == 0){
+                pro(stringTochar(INCLUDE), word, line);
+                fseek(fp, -1L, SEEK_CUR);
+            }else if(strcmp("define", word) == 0){
+                pro(stringTochar(DEFINE), word, line);
+                fseek(fp, -1L, SEEK_CUR);
+            }else{
+                pro(stringTochar(ERROR), word, line); // 出错
+            }
         }else{
             word = (char *)malloc(sizeof(char)*20);
             for(int i=0; i<leno; i++){
@@ -253,6 +303,7 @@ int main(){
                 }
             }
             free(word);
+            word = NULL;
         }
     }
     display();
