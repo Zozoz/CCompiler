@@ -34,6 +34,7 @@ struct NFA{
     char ch;
     int to;
     int next;
+    bool isEnd;
 }nfa[M];
 int head_n[N];
 int pn;
@@ -42,6 +43,7 @@ struct DFA{
     int to;
     char ch;
     int next;
+    bool isEnd;
 }dfa[M];
 int head_d[N];
 int pd;
@@ -71,9 +73,8 @@ void get_keyword(){
         num_key++;
     }
     for(int i=0; i<num_key; i++){
-        cout<<key[i]<<"|"<<endl;
+        cout<<key[i]<<endl;
     }
-
 }
 
 void init(){
@@ -107,16 +108,6 @@ void change_to_map(char ch){
             n_flag[ch] = ++n_cnt;
             flag_n[n_cnt] = ch;
         }
-    }else if(ch >= 'a' && ch <= 'z' || ch == '_'){
-        if (t_flag[ch] == 0){
-            t_flag[ch] = ++t_cnt;
-            flag_t[t_cnt] = ch;
-        }
-    }else if(ch >= '0' && ch <= '9'){
-        if (t_flag[ch] == 0){
-            t_flag[ch] = ++t_cnt;
-            flag_t[t_cnt] = ch;
-        }
     }else if (ch == '#'){
         if (t_flag[ch] == 0){
             t_flag[ch] = ++t_cnt;
@@ -126,6 +117,12 @@ void change_to_map(char ch){
         if (n_flag['Z'] == 0){
             n_flag['Z'] = ++n_cnt;
             flag_n[n_cnt] = 'Z';
+        }
+    }
+    else{
+        if (t_flag[ch] == 0){
+            t_flag[ch] = ++t_cnt;
+            flag_t[t_cnt] = ch;
         }
     }
 }
@@ -201,35 +198,15 @@ void get_move(set<int> T, char ch, set<int> &tmp){
 }
 
 int is_new_set(int len, set<int> tmp, int mylen){
-    int arr1[1000], arr2[1000];
-    int cnt1 = -1, cnt2;
-    for(int i : tmp){
-        arr1[++cnt1] = i;
-    }
-    for(int i=1; i<=len; i++){
-        if (i == mylen){
+    for (int i=1; i<len; i++){
+        /*if (i == mylen){
             continue;
-        }
-        cnt2 = -1;
-        for(int x : myset[i]){
-            arr2[++cnt2] = x;
-        }
-        if(cnt1 == cnt2){
-            bool flag = true;
-            for(int j=0; j<=cnt1; j++){
-                if(arr1[j] != arr2[j]){
-                    flag = false;
-                    break;
-                }
-            }
-            if(flag){
-                return i;
-            }
-        }else{
-            continue;
+        }*/
+        if (tmp == myset[i]){
+            return i;
         }
     }
-    return -1;
+    return len;
 }
 
 //NFA转换成DFA
@@ -256,39 +233,19 @@ void n_to_d(){
             myset[++len_of_c].clear();
             memset(vst, false, sizeof(vst));
             get_closure(tmp, '#', myset[len_of_c], vst);
-            if(myset[len_of_c].size()==0 || is_new_set(len_of_c, myset[len_of_c], len_of_c) != -1){
-                --len_of_c;
+            int id = is_new_set(len_of_c, myset[len_of_c], len_of_c);
+            if (myset[len_of_c].size() == 0){
+                len_of_c--;
+            }else{
+                if (id != len_of_c){
+                    len_of_c--;
+                }
+                add_dfa(index, id, ch);
             }
         }
         index++;
         if(index > len_of_c){
             break;
-        }
-    }
-
-    memset(d, 0, sizeof(d));
-    for(int i=1; i<=len_of_c; i++){
-        for(int j=1; j<=t_cnt; j++){
-            char ch = flag_t[j];
-            if (ch == '#'){
-                continue;
-            }
-            set<int> tmp;
-            set<int> closure;
-            get_move(myset[i], ch, tmp);
-            memset(vst, false, sizeof(vst));
-            get_closure(tmp, '#', closure, vst);
-            if (closure.size() == 0){
-                continue;
-            }
-            int to = is_new_set(len_of_c, closure, i);
-            if (to != -1){
-                d[i][j] = to;
-                add_dfa(i, to, ch);
-            }else{
-                d[i][j] = i;
-                add_dfa(i, i, ch);
-            }
         }
     }
 
@@ -304,7 +261,11 @@ void n_to_d(){
 
 void add_display(char *type, char *value, int line, bool flag){
     Node *q = new Node;
-    strcpy(q->type, type);
+    if (flag){
+        strcpy(q->type, type);
+    }else{
+        strcpy(q->type, "error");
+    }
     strcpy(q->value, value);
     q->line = line;
     q->flag = flag;
@@ -324,20 +285,24 @@ bool isbound(char ch, int line){
             return true;
         }
     }
+    /*
     len = strlen(operatorword);
     for (int i=0; i<len; i++){
         if (ch == operatorword[i]){
             return true;
         }
-    }
+    }*/
     return false;
 }
 
 void display(){
     p = root;
     Node *q;
+	fstream ct;
+	ct.open("lex_analyze.txt",ios::out);
     while(p != NULL){
         cout<<"(   "<<p->line<<"  ,  "<<p->type<<"  ,  "<<p->value<<"   )"<<endl;
+        ct<<p->line<<" "<<p->value<<" "<<p->type<<endl;
         q = p;
         p = p->next;
         delete q;
@@ -420,12 +385,12 @@ void process(){
             bool fl = false;
             if (ch == ' ' || ch == '\n'){
                 if(strlen(tmp) != 0){
-                    add_display(get_type(word), word, line, false);
+                    add_display(get_type(word), word, line, true);
                 }
                 free(word);
             }else if (isbound(ch, line)){
                 if(strlen(tmp) != 0){
-                    add_display(get_type(word), word, line, false);
+                    add_display(get_type(word), word, line, true);
                 }
                 free(word);
                 word = (char *)malloc(sizeof(char)*2);
@@ -454,7 +419,6 @@ void process(){
 
 int main(){
     bool flag = g_to_n();
-    cout<<"flag = "<<flag<<endl;
     n_to_d();
     process();
     return 0;

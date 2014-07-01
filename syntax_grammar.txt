@@ -1,0 +1,7 @@
+S -> a H
+H -> a M d
+H -> d
+M -> A b
+M -> $
+A -> a M
+A -> e
